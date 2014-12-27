@@ -1,3 +1,6 @@
+; Assignment 1: Recursion and Higher-Order Functional Abstractions,
+; due Wednesday, September 3rd at 11:59pm.
+
 ; Author: Lyruse Huang.
 ; Date: 2014-12-27.
 ; Assignments from C311 which is Daniel Friedman's class in 2014
