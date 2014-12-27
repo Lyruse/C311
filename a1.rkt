@@ -4,7 +4,9 @@
 ; Webpage for these assignments: 
 ; https://cgi.soic.indiana.edu/~c311/doku.php?id=assignment-1
 
-
+;(require "a1-student-tests.rkt")
+;(test-file #:file-name "a1.rkt")
+; => 87 success(es) 0 failure(s) 0 error(s) 87 test(s) run
 
 #lang racket
 
