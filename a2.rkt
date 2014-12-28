@@ -312,6 +312,7 @@
 ;   3) the formal parameters of the lambda expressions are dropped.
 
 ; lambda-calculus-exp, Accumulator -> lambda-exp
+#;
 (define lex
   (lambda (exp acc)
     (pmatch exp
@@ -324,7 +325,7 @@
                       (cons 
                        (cons x 0)
                        (map
-                        (lambda (asso)
+                        (lambda (asso)  ; too complicated.
                           `(,(car asso) . ,(add1 (cdr asso))))
                         (filter (lambda (asso)
                                  (if (eq? (car asso) x)
@@ -333,6 +334,15 @@
                                acc)))))]
       [`(,rator ,rand)
        `(,(lex rator acc) ,(lex rand acc))])))
+;;        Use the right datastructure makes the programs much more easily to be understood.
+(define lex
+  (lambda (exp acc)
+    (pmatch exp
+      [`,x (guard (symbol? x)) (if (memv x acc)
+                                   `(var ,(- (length acc) (length (memv x acc))))
+                                   `(free-var ,x ))]
+      [`(lambda (,x) ,body) `(lambda ,(lex body (cons x acc)))]
+      [`(,rator ,rand) (list (lex rator acc) (lex rand acc))])))
 #;
 (lex '((lambda (x) (x y)) (lambda (c) (lambda (d) (e c)))) '()) 
 ;=>((lambda ((var 0) (free-var y))) (lambda (lambda ((free-var e) (var 1)))))
