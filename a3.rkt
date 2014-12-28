@@ -209,7 +209,7 @@
            (value-of alt env))]
       [`(set! ,var ,value)
        `((,var . ,value) . ())]
-      [`(begin2 ,e1 ,e2)     
+      [`(begin2 ,e1 ,e2)     ;;;;;;;;;;;;;;;;;;;;;; It's time to include closures, which makes lambda work.
        (let ([res (value-of e1 (lambda (id)
                                  (if (eq? 'inside id)
                                      #t
@@ -345,3 +345,81 @@
                ((((((n 1bus) (f f)) n *) 1 (n ?orez) fi)
                  (n) adbmal)
                 (f) adbmal))) (empty-env))  ;; ==> 120
+
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Assignment 7 ;;;;;;;;;;;;;;;;;;;;
+; define value-of-lex:
+(define value-of-lex
+  (lambda(exp env)
+    (pmatch exp
+      (`,c (guard (or (boolean? c) (number? c))) c) 
+      (`(sub1 ,body) (sub1 (value-of-lex body env)))
+      (`(zero? ,body) (zero? (value-of-lex body env)))
+      (`(* ,n1 ,n2) (* (value-of-lex n1 env) (value-of-lex n2 env)))
+      (`(if ,t ,c ,a) (if (value-of-lex t env) (value-of-lex c env) (value-of-lex a env)))
+      (`(var ,num) (apply-env-lex env num))
+      (`(lambda ,body) (lambda (a) (value-of-lex body (extend-env-lex a env))))
+      (`(,rator ,rand) ((value-of-lex rator env) (value-of-lex rand env))))))
+ 
+(define empty-env-lex 
+  (lambda () '()))
+(define extend-env-lex
+  (lambda (val env)
+    (cons val env)))
+(define apply-env-lex
+  (lambda (env n)
+    (cond
+    #;  [(null? env) (error 'env "unbound variable. ~s" n)] ; not neccesary
+    ;; not required to handle bad data.
+      [(zero? n) (car env)]       
+      [else (apply-env-lex (cdr env) (- n 1))])))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Church numerals ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define c0 (lambda (f) (lambda (x) x)))
+(define c5 (lambda (f) (lambda (x) (f (f (f (f (f x))))))))
+(define c1 (lambda (f) (lambda (b) (f b))))
+;=> ((c5 add1) 0)   ;; numbers are those defined by their interface procedure.
+(define c+ (lambda (m)
+             (lambda (n)
+               (lambda (f)
+                 (lambda (base)
+                   ((m f) ((n f) base)))))))
+#;  (let ((c10 ((c+ c5) c5))))
+; => ((c10 add1) 0))
+      
+      
+;;            Church predecessor
+#; (((csub1 c5) add1) 0)
+; => 4
+#;  (((csub1 c0) add1) 0) ; => 0
+(define csub1
+  (lambda (n)
+    (lambda (f)
+      (lambda (base)
+        (((n (lambda (g) (lambda (h) (h (g f))))) 
+          (lambda (u) base)) 
+         (lambda (id) id))))))
+;
+;(((c1 (lambda (g) (lambda (h) (h (g f))))) 
+;  (lambda (u) base)) 
+; (lambda (id) id))
+;;=>
+;(((lambda (g) (lambda (h) (h (g f)))) (lambda (u) base))
+; (lambda (id) id))
+;(((c2 (lambda (g) (lambda (h) (h (g f))))) 
+;  (lambda (u) base)) 
+; (lambda (id) id))
+;(f (f x))
+;((lambda (g) (lambda (h) (h (g f))))
+; ((lambda (g) (lambda (h) (h (g f))))
+;  ((lambda (g) (lambda (h) (h (g f)))) ; looks a little like cps style
+;   (lambda (u) base))))
