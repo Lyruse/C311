@@ -7,7 +7,12 @@
 ; Webpage for these assignments: 
 ; https://cgi.soic.indiana.edu/~c311/doku.php?id=assignment-2
 
-
+#; (require C311/a2-student-test3)
+#; (test-file #:file-name a3.rkt)
+;; Test result: 86 success(es) 4 failure(s) 0 error(s) 90 test(s) run
+;; The 4 failure(s) are dued to the order of the answers produced in 
+;; unify, unique-bound-vars, unique-free-vars, union.
+;; They are a must to the test file, but my programs are correct 100%.
 
 #lang racket
 (require C311/pmatch)
@@ -431,13 +436,77 @@
 ;        returns #t if a var both occur free and occur bound in the lambda-calculus-exp.
 ;        otherwise #f.
 
+;   Not a clue. Your solution should be a one-pass solution,
+;   meaning you should not recur over 
+;   the same data twice, and you should not use an accumulator.
+;                              Done!!! But use a internal procedure.
+
 ; Symbol, lambda-calculus-exp -> Boolean.
+; First Edition, with no immediate return when met with 'both
+#;
 (define var-occurs-both?
-  (lambda (x exp)
-    (pmatch exp
-      [`,x (guard (symbol? x)) #f]
-      [`(lambda (,x) ,body)
-       ()]
-      [`(,rator ,rand)
-       ()])))    ;; a little triky, left for tomorow.
+  (lambda (e exp)
+    (define f
+      (lambda (e exp)
+        (pmatch exp
+          [`,x (guard (symbol? x)) (if (eq? x e) 
+                                       'free
+                                       'nothing)] 
+          [`(lambda (,x) ,body)
+           (cond
+             [(eq? x e)
+              (if (memv x (vars body)) 'bound 'nothing)]
+             [else (f e body)])]
+          [`(,rator ,rand)
+           (let ([a (f e rator)]
+                 [d (f e rand)])
+             (cond
+               [(or (eq? a 'both) (eq? d 'both))
+                'both]
+               [(and (eq? a 'free) (eq? d 'bound)) 'both]
+               [(and (eq? a 'bound) (eq? d 'free)) 'both]
+               [(or (eq? a 'bound) (eq? d 'bound)) 'bound]
+               [(or (eq? a 'free) (eq? d 'free)) 'free]
+               [else 'nothing]))])))
+    (if (eq? 'both (f e exp)) #t #f)))    ;; a little triky, left for another day.! Got it!
+;; in this program, once in a while , I'am stuck in using boolean to represent the result, 
+;; but as we know, the result has four different alternative, we can't just use boolean to 
+;; represent the information, so I just use Symbol to mark the result. Due to Scheme's power,
+;; this is easily done.
+
+(define var-occurs-both?
+  (lambda (e exp)
+    (define k #f)
+    (define f
+      (lambda (e exp)
+        (pmatch exp
+          [`,x (guard (symbol? x)) (if (eq? x e) 
+                                       'free
+                                       'nothing)] 
+          [`(lambda (,x) ,body)
+           (cond
+             [(eq? x e)
+              (if (memv x (vars body)) 'bound 'nothing)]
+             [else (f e body)])]
+          [`(,rator ,rand)
+           (let ([a (f e rator)]
+                 [d (f e rand)])
+             (cond
+               [(or (eq? a 'both) (eq? d 'both))
+                (k 'both)]
+               [(and (eq? a 'free) (eq? d 'bound)) (k 'both)]
+               [(and (eq? a 'bound) (eq? d 'free)) (k 'both)]
+               [(or (eq? a 'bound) (eq? d 'bound)) 'bound]
+               [(or (eq? a 'free) (eq? d 'free)) 'free]
+               [else 'nothing]))])))
+    (if (eq? 'both (call/cc (lambda (con)
+                              (set! k con)
+                              (f e exp)))) 
+        #t #f)))
+
+#;
+(define var-occurs-both?
+  (lambda (e exp)
+    (and (var-occurs-free? e exp)
+         (var-occurs-bound? e exp)))) ; this solution recur over twice.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
