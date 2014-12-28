@@ -469,6 +469,7 @@
                [(or (eq? a 'free) (eq? d 'free)) 'free]
                [else 'nothing]))])))
     (if (eq? 'both (f e exp)) #t #f)))    ;; a little triky, left for another day.! Got it!
+
 ;; in this program, once in a while , I'am stuck in using boolean to represent the result, 
 ;; but as we know, the result has four different alternative, we can't just use boolean to 
 ;; represent the information, so I just use Symbol to mark the result. Due to Scheme's power,
@@ -492,8 +493,8 @@
            (let ([a (f e rator)]
                  [d (f e rand)])
              (cond
-               [(or (eq? a 'both) (eq? d 'both))
-                (k 'both)]
+               #;[(or (eq? a 'both) (eq? d 'both))  ; this clause is no longer possible
+                  (k 'both)]                        ; cause now I use jump to exit.
                [(and (eq? a 'free) (eq? d 'bound)) (k 'both)]
                [(and (eq? a 'bound) (eq? d 'free)) (k 'both)]
                [(or (eq? a 'bound) (eq? d 'bound)) 'bound]
