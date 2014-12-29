@@ -171,6 +171,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  interpretert 1 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; First Edition
+;; Date: 2014-12-29 4:00am.
 (define value-of
   (lambda (exp env)
     (pmatch exp
@@ -209,7 +211,8 @@
            (value-of alt env))]
       [`(set! ,var ,value)
        `((,var . ,value) . ())]
-      [`(begin2 ,e1 ,e2)     ;;;;;;;;;;;;;;;;;;;;;; It's time to include closures, which makes lambda work.
+      [`(begin2 ,e1 ,e2)    
+       ;; just a little like ((lambda (v) e2) e1).
        (let ([res (value-of e1 (lambda (id)
                                  (if (eq? 'inside id)
                                      #t
@@ -217,6 +220,9 @@
          (if (pair? res)
              (let ([res^ (if (with-handlers ([exn:fail? (lambda (e) #f)])
                                (env (caar res)))
+;; can't differ the same name var, which should be registered to a unique id.
+;; ((lambda (f) ((lambda (x) (begin (f x) x)) 100))
+;;  (lambda (x) (set! x 900)))  => ((x . 900)) ; which is not right.                            
                              (value-of e2 (lambda (id)
                                             (cond
                                               [(assv id res) => cdr]   ;; so ridiculous!!!!!!
