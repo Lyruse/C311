@@ -131,8 +131,8 @@ call-by-need	val-of-cbneed
   (lambda ()
     '()))
 (define extend-env-cbr
-  (lambda (var val env)
-    (if (or (box? val) (list? val))   ;; make the input of closure also work, but it will not work when 
+  (lambda (var val env) ; change at the apply position.
+    (if (or (box? val) #;(list? val))   ;; make the input of closure also work, but it will not work when 
         `((,var . ,val) . ,env)       ;; support list . the better idea is to make it a unique object.
         `((,var . ,(box val)) . ,env))))  ;; use box to implement set! syntax.
 (define apply-env-cbr
@@ -228,9 +228,9 @@ call-by-need	val-of-cbneed
       [`(lambda (,x) ,body) (closure-cbr x body env)]
       [`(,rator ,x) (guard (symbol? x))
                     (apply-closure-cbr-im
-                     (val-of-cbr-im rator env)
+                     (unpack (val-of-cbr-im rator env))
                      (apply-env-cbr-box env x))]
       [`(,rator ,rand) (apply-closure-cbr-im
-                        (val-of-cbr-im rator env)
+                        (unpack (val-of-cbr-im rator env))
                         (val-of-cbr-im rand env))])))
 (define val-of-cbr (lambda (exp env) (unpack (val-of-cbr-im exp env))))
