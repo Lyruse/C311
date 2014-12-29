@@ -12,7 +12,7 @@
 #;(require C311/a5-student-tests)
 #;(test-file)
 ;; test result: 
-;; 
+;; 16 success(es) 0 failure(s) 0 error(s) 16 test(s) run. Perfect.
 
 ;;;;;;;;;;;;;;;;;;;;;;; association list as environment ;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define empty-env
@@ -97,6 +97,12 @@ call-by-need	val-of-cbneed
     (pmatch closure
       [`(closure ,x ,body ,env)
        (val-of-cbv body (extend-env-cbv x arg env))])))
+; ==================utility for lazy cons ======================
+(define unbox/cons
+  (lambda (b)
+    (let ([res ((unbox b))])
+      (set-box! b (lambda () res))
+      res)))
 
 ; First Edition, pass the test from a3-student-test3.rkt, but not mine.
 (define val-of-cbv
@@ -105,13 +111,32 @@ call-by-need	val-of-cbneed
       [`,b (guard (boolean? b)) b]
       [`,n (guard (number? n)) n]
       [`,x (guard (symbol? x)) (apply-env-cbv env x)]
+      [`(quote ()) '()]
+      [`(null? ,ls) (null? (val-of-cbv ls env))]
       [`(zero? ,n) (zero? (val-of-cbv n env))]
+      [`(add1 ,n) (add1 (val-of-cbv n env))]
       [`(sub1 ,n) (sub1 (val-of-cbv n env))]
       [`(* ,n1 ,n2) (* (val-of-cbv n1 env) (val-of-cbv n2 env))]
       [`(if ,test ,conseq ,alt) (if (val-of-cbv test env)
                                     (val-of-cbv conseq env)
                                     (val-of-cbv alt env))]
       [`(begin2 ,e1 ,e2) (begin (val-of-cbv e1 env) (val-of-cbv e2 env))]
+      [`(let ([,x ,e])
+          ,body)
+       (val-of-cbv body (extend-env-cbv x (val-of-cbv e env) env))]
+      [`(cons^ ,a ,d)  ;; lazy version of cons
+       (cons (box (lambda () (val-of-cbv a env)))
+             (box (lambda () (val-of-cbv d env))))]
+      [`(car^ ,ls)
+       (unbox/cons (car (val-of-cbv ls env)))]
+      [`(cdr^ ,ls)
+       (unbox/cons (cdr (val-of-cbv ls env)))]
+      [`(cons ,a ,d)  ;; strict version
+       (cons (val-of-cbv a env) (val-of-cbv d env))]
+      [`(car ,ls)
+       (car (val-of-cbv ls env))]
+      [`(cdr ,ls)
+       (car (val-of-cbv ls env))]
       [`(set! ,var ,rhs)
        (let ([val (val-of-cbv rhs env)]
              [var (apply-env-cbv-set! env var)])
@@ -234,3 +259,82 @@ call-by-need	val-of-cbneed
                         (unpack (val-of-cbr-im rator env))
                         (val-of-cbr-im rand env))])))
 (define val-of-cbr (lambda (exp env) (unpack (val-of-cbr-im exp env))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;    interpreter 3 call by name       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;closure representation using data-structure;;;;;;;;;;;;;;;
+(define closure-cbname
+  (lambda (x body env)
+    `(closure ,x ,body ,env)))
+(define apply-closure-cbname
+  (lambda (closure arg)
+    (pmatch closure
+      [`(closure ,x ,body ,env)
+       (val-of-cbname body (extend-env x arg env))])))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define val-of-cbname
+  (lambda (exp env)
+    (pmatch exp
+      [`,b (guard (boolean? b)) b]
+      [`,n (guard (number? n)) n]
+      [`,x (guard (symbol? x)) ((unbox (apply-env env x)))]   ;; much easier writing unbox here
+      [`(zero? ,n) (zero? (val-of-cbname n env))]           ;; instead writing in the env helper.
+      [`(sub1 ,n) (sub1 (val-of-cbname n env))]
+      [`(* ,n1 ,n2) (* (val-of-cbname n1 env) (val-of-cbname n2 env))]
+      [`(if ,test ,conseq ,alt) (if (val-of-cbname test env)
+                                    (val-of-cbname conseq env)
+                                    (val-of-cbname alt env))]
+      [`(begin2 ,e1 ,e2) (begin (val-of-cbname e1 env) (val-of-cbname e2 env))]
+      [`(random ,n) (random (val-of-cbname n env))]
+      [`(lambda (,x) ,body) (closure-cbname x body env)]
+      [`(,rator ,rand) (apply-closure-cbname
+                        (val-of-cbname rator env)
+                        (box (lambda () (val-of-cbname rand env))))])))
+
+
+
+
+
+;; ===================================================================================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; interpreter 4 call by neeed ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;closure representation using data-structure;;;;;;;;;;;;;;;
+(define closure-cbneed
+  (lambda (x body env)
+    `(closure ,x ,body ,env)))
+(define apply-closure-cbneed
+  (lambda (closure arg)
+    (pmatch closure
+      [`(closure ,x ,body ,env)
+       (val-of-cbneed body (extend-env x arg env))])))
+; ================ utility for evaluation and storage =====================
+(define unbox/need
+  (lambda (b)
+    (let ([res ((unbox b))])
+      (set-box! b (lambda () res))
+      res)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define val-of-cbneed
+  (lambda (exp env)
+    (pmatch exp
+      [`,b (guard (boolean? b)) b]
+      [`,n (guard (number? n)) n]
+      [`,x (guard (symbol? x)) (unbox/need (apply-env env x))]   ;; much easier writing unbox here
+      [`(zero? ,n) (zero? (val-of-cbneed n env))]           ;; instead writing in the env helper.
+      [`(sub1 ,n) (sub1 (val-of-cbneed n env))]
+      [`(* ,n1 ,n2) (* (val-of-cbneed n1 env) (val-of-cbneed n2 env))]
+      [`(if ,test ,conseq ,alt) (if (val-of-cbneed test env)
+                                    (val-of-cbneed conseq env)
+                                    (val-of-cbneed alt env))]
+      [`(begin2 ,e1 ,e2) (begin (val-of-cbneed e1 env) (val-of-cbneed e2 env))]
+      [`(random ,n) (random (val-of-cbneed n env))]
+      [`(lambda (,x) ,body) (closure-cbneed x body env)]
+      [`(,rator ,rand) (apply-closure-cbneed
+                        (val-of-cbneed rator env)
+                        (box (lambda () (val-of-cbneed rand env))))])))
