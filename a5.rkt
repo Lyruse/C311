@@ -104,7 +104,7 @@ call-by-need	val-of-cbneed
       (set-box! b (lambda () res))
       res)))
 
-; First Edition, pass the test from a3-student-test3.rkt, but not mine.
+
 (define val-of-cbv
   (lambda (exp env)
     (pmatch exp
@@ -150,7 +150,7 @@ call-by-need	val-of-cbneed
 
 
 
-;;;;;;;;;;;;;;;;   interpreter for Call-by-value   ;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;   interpreter for Call-by-reference   ;;;;;;;;;;;;;;;;;;;
 ; environment utilities
 (define empty-env-cbr   ;; same as empty-env, which will be used in tests.
   (lambda ()
@@ -188,7 +188,7 @@ call-by-need	val-of-cbneed
        (val-of-cbr-im body (extend-env-cbr x arg env))])))
 
 
-; First Edition, pass the test from a3-student-test3.rkt, but not mine.
+; First Edition, pass the test from a5-student-test3.rkt, but not mine.
 #;
 (define val-of-cbr
   (lambda (exp env)
@@ -231,6 +231,7 @@ call-by-need	val-of-cbneed
                  (if (box? v)
                      (unbox v)
                      v)))
+;; this edition pass the test above which first edition fails with.
 (define val-of-cbr-im
   (lambda (exp env)
     (pmatch exp
