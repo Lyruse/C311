@@ -366,16 +366,86 @@
   (lambda (f k)
     (k (lambda (ls k)
          (if (null? ls)
-             (display ls)
+             (k 0) ; miss the k, fuck it!
              (f (cdr ls)
                 (lambda (x)
-                  (display "hello")
                   (k (add1 x)))))))))
 #;((why almost-length) '(a b c d e f))
 ; =>6
-#;(why-cps almost-length-cps (lambda (f) ;; not work yet, don't know why, 'll figure it out.
-                               (f '(1) (empty-k))))
-
+#;
+(why-cps almost-length-cps (lambda (f) ;; not work yet, don't know why, 'll figure it out.
+                               (f '(1 2 3) (empty-k))))
+; ==> 3
 ; ========================= A 18 ===============================
+; so easy.
 (define why-cps-cps
-  (lambda () #f))
+  (lambda (f k0 k1)
+    ((lambda (g k0 k1)
+       (f (lambda (x k) (g g (lambda (hehe) (hehe x k))))
+          k0 k1))
+     (lambda (g k0 k1)
+       (f (lambda (x k) (g g (lambda (hehe) (hehe x k))))
+          k0 k1))
+     k0
+     k1)))
+#; 
+(why-cps-cps almost-length-cps (lambda (f) ;; not work yet, don't know why, 'll figure it out.
+                                 (f '(1 2 3) (empty-k)))
+             (empty-k))
+;; how to use why-cps-cps, Havn't figured it out.
+
+
+
+
+
+; =========================== real Brainteaser ==============================
+(define cps
+  (lambda (exp)
+    (letrec ([id (lambda (x) x)]
+             [ctx0 (lambda (x) `(k ,x))]
+             [fv (let ([n -1])
+                   (lambda ()
+                     (set! n (+ n 1))
+                     (string->symbol
+                      (string-append "v"
+                                     (number->string n)))))]
+             [cps1 (lambda (exp ctx)
+                     (pmatch exp
+                       [`,x (guard (symbol? x)) (ctx x)]
+                       [`(if ,test ,conseq ,alt)
+                        (cps1 test
+                              (lambda (t)
+                                (cond
+                                  [(memq ctx `(id ctx0))
+                                   `(if ,t ,(cps1 conseq ctx)
+                                        ,(cps1 alt ctx))]
+                                  [else (let ([v (fv)])
+                                          `(let ([k (lambda (,v)
+                                                      ,(cps1 v ctx))])
+                                             (if ,t ,(cps1 conseq ctx0)
+                                                 ,(cps1 alt ctx0))))])))]
+                       [`(lambda (,x) ,body)
+                        (ctx `(lambda (,x k)
+                                ,(cps1 body ctx0)))]
+                       [`(,rator ,rand)
+                        (cps1 rand
+                              (lambda (d)
+                                (cps1 rator
+                                      (lambda (a)
+                                        (cond
+                                          [(eq? ctx ctx0) `(,a ,d k)]
+                                          [else (let ([v (fv)])
+                                                  `(,a ,d
+                                                       (lambda (,v)
+                                                         ,(cps1 v ctx))))])))))]))])
+      (cps1 exp id))))
+#;(cps '(lambda (f)
+          ((lambda (g)
+             (f (lambda (x) ((g g) x))))
+           (lambda (g)
+             (f (lambda (x) ((g g) x)))))))
+; ==>
+#;(lambda (f k)
+    ((lambda (g k) (f (lambda (x k) (g g (lambda (v1) (v1 x k)))) k))
+     (lambda (g k) (f (lambda (x k) (g g (lambda (v0) (v0 x k)))) k))
+     k))
