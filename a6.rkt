@@ -381,10 +381,10 @@
 (define why-cps-cps
   (lambda (f k0 k1)
     ((lambda (g k0 k1)
-       (f (lambda (x k) (g g (lambda (hehe) (hehe x k))))
+       (f (lambda (x k kk) (g g (lambda (hehe kkk) (hehe x k kkk)) kk))
           k0 k1))
      (lambda (g k0 k1)
-       (f (lambda (x k) (g g (lambda (hehe) (hehe x k))))
+       (f (lambda (x k kk) (g g (lambda (hehe kkk) (hehe x k kkk)) kk))
           k0 k1))
      k0
      k1)))
@@ -402,7 +402,7 @@
 (define cps
   (lambda (exp)
     (letrec ([id (lambda (x) x)]
-             [ctx0 (lambda (x) `(k ,x))]
+             [ctx0 (lambda (x) `(kkk ,x))]
              [fv (let ([n -1])
                    (lambda ()
                      (set! n (+ n 1))
@@ -425,7 +425,10 @@
                                              (if ,t ,(cps1 conseq ctx0)
                                                  ,(cps1 alt ctx0))))])))]
                        [`(lambda (,x) ,body)
-                        (ctx `(lambda (,x k)
+                        (ctx `(lambda (,x kkk)
+                                ,(cps1 body ctx0)))]
+                       [`(lambda (,x ,y) ,body)
+                        (ctx `(lambda (,x ,y kkk)
                                 ,(cps1 body ctx0)))]
                        [`(,rator ,rand)
                         (cps1 rand
@@ -433,11 +436,24 @@
                                 (cps1 rator
                                       (lambda (a)
                                         (cond
-                                          [(eq? ctx ctx0) `(,a ,d k)]
+                                          [(eq? ctx ctx0) `(,a ,d kkk)]
                                           [else (let ([v (fv)])
                                                   `(,a ,d
                                                        (lambda (,v)
-                                                         ,(cps1 v ctx))))])))))]))])
+                                                         ,(cps1 v ctx))))])))))]
+                       [`(,rator ,rand1 ,rand2)
+                        (cps1 rand1
+                              (lambda (r1)
+                                (cps1 rand2
+                                      (lambda (r2)
+                                        (cps1 rator
+                                              (lambda (a)
+                                                (cond
+                                                  [(eq? ctx ctx0) `(,a ,r1 ,r2 kkk)]
+                                                  [else (let ([v (fv)])
+                                                          `(,a ,r1 ,r2
+                                                               (lambda (,v)
+                                                                 ,(cps1 v ctx))))])))))))]))])
       (cps1 exp id))))
 #;(cps '(lambda (f)
           ((lambda (g)
