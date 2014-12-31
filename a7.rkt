@@ -11,6 +11,7 @@
 #;(require C311/a7-student-tests)
 #;(test-file)
 ; test result:
+; 7 success(es) 0 failure(s) 0 error(s) 7 test(s) run. Still perfect.
 
 (define empty-k
   (lambda ()
@@ -101,11 +102,7 @@
        [`(closure ,x1 ,x2 ,body ,env)
         (value-of-cps body (extend-env x2 rand2 (extend-env x1 rand1 env)) ctx)])]))
 #|
-(define apply-closure-cps-fn
-  (lambda (rator rand)
-    (pmatch rator
-      [`(closure ,x ,body ,env)
-       (value-of-cps-fn body (extend-env x rand env))])))
+
 (define apply-closure-cps-ds
   (lambda (rator rand)
     (pmatch rator
@@ -204,8 +201,180 @@
 ;=> 120      So glad to gain the power that I couldn't imagine.
 
 
+;=====================================================================================
+;=====================================================================================
+;============================== value-of-cps-fn ======================================
+(define empty-k-fn empty-k)
+(define apply-closure-cps-fn
+  (lambda (rator rand)
+    (pmatch rator
+      [`(closure ,x ,body ,env)
+       (value-of-cps-fn body (extend-env x rand env))])))
+(define context-tail-fn
+  (lambda (f ctx)
+    (lambda (x)
+      (ctx (f x)))))
+(define context-op-fn
+  (lambda (x2 env * ctx)
+    (lambda (x1)
+      (value-of-cps-fn x2 env
+                       (lambda (x2)
+                         (ctx (* x1 x2)))))))
+(define context-if-fn
+  (lambda (conseq alt env ctx)
+    (lambda (t)
+      (if t
+          (value-of-cps-fn conseq env ctx)
+          (value-of-cps-fn alt env ctx)))))
+(define context-return-fn  ;;; only for call/cc application.
+  (lambda (v-exp env)
+    (lambda (k)
+      (value-of-cps-fn v-exp env k))))
+(define context-app-fn     ;; for application.
+  (lambda (rand apply-closure-cps env ctx)
+    (lambda (rator)
+      (value-of-cps-fn rand env
+                       (lambda (rand)
+                         (apply-closure-cps
+                          rator
+                          rand
+                          ctx))))))
+
+(define value-of-cps-fn
+  (lambda (expr env ctx)
+    (pmatch expr
+      [`,n (guard (or (number? n) (boolean? n))) (ctx n)]
+      [`(+ ,x1 ,x2)
+       (value-of-cps-fn x1 env
+                        (context-op-fn x2 env + ctx))]
+      [`(* ,x1 ,x2) 
+       (value-of-cps-fn x1 env (context-op-fn x2 env * ctx))]
+      [`(sub1 ,x) 
+       (value-of-cps-fn x env (context-tail-fn sub1 ctx))]
+      [`(zero? ,x) (value-of-cps-fn x env (context-tail-fn zero? ctx))]
+      [`(if ,test ,conseq ,alt) 
+       (value-of-cps-fn test env (context-if-fn conseq alt env ctx))]
+      [`(capture ,k-id ,body)
+       (value-of-cps-fn body (extend-env k-id ctx env) ctx)]
+      [`(return ,v-exp ,k-exp) 
+       (value-of-cps-fn k-exp env
+                        (context-return-fn v-exp env))] 
+      [`,x (guard (symbol? x)) (ctx (apply-env env x))]
+      [`(lambda (,id) ,body) (ctx (closure id body env))]
+      [`(lambda (,id1 ,id2) ,body) (ctx (closure id1 id2 body env))]
+      [`(,rator ,rand) 
+       (value-of-cps-fn rator env 
+                        (context-app-fn rand apply-closure-cps env ctx))])))
 
 
+
+;=====================================================================================
+;=====================================================================================
+;============================== value-of-cps-ds ======================================
+(define apply-closure-cps-ds
+  (lambda (rator rand ctx)
+    (pmatch rator
+      [`(closure ,x ,body ,env)
+       (value-of-cps-ds body (extend-env x rand env) ctx)])))
+
+;====================continuation using data-structrue representation =================
+(define empty-k-ds
+  (lambda ()
+    '(empty-k-ds)))
+(define apply-context
+  (lambda (ctx v)
+    (pmatch ctx
+      [`(empty-k-ds) v]
+      [`(context-tail-ds ,f ,ctx)
+       (apply-context ctx (f v))]
+      [`(context-op-ds ,x2 ,env ,f ,ctx)
+       (value-of-cps-ds x2 env (context-tail-f-ds v f ctx))]
+      [`(context-tail-f-ds ,x1 ,f ,ctx)
+       (apply-context ctx (f v x1))]
+      [`(context-if-ds ,conseq ,alt ,env ,ctx)
+       (if v
+           (value-of-cps-ds conseq env ctx)
+           (value-of-cps-ds alt env ctx))]
+      [`(context-return-ds ,v-exp ,env)
+       (value-of-cps-ds v-exp env v)]
+      [`(context-app-ds ,rand ,env ,ctx)
+       (value-of-cps-ds rand env (context-app-rand-ds v ctx))]
+      [`(context-app-rand-ds ,rator ,ctx)
+       (apply-closure-cps-ds rator v ctx)])))
+
+(define context-tail-ds
+  (lambda (f ctx)
+    `(context-tail-ds ,f ,ctx)))
+
+(define context-op-ds
+  (lambda (x2 env f ctx)
+    `(context-op-ds ,x2 ,env ,f ,ctx)))
+
+(define context-tail-f-ds
+  (lambda (v f ctx)
+    `(context-tail-f-ds ,v ,f ,ctx)))
+
+(define context-if-ds
+  (lambda (conseq alt env ctx)
+    `(context-if-ds ,conseq ,alt ,env ,ctx)))
+
+(define context-return-ds  ;;; only for call/cc application.
+  (lambda (v-exp env)
+    `(context-return-ds ,v-exp ,env)))
+
+(define context-app-ds
+  (lambda (rand env ctx)
+    `(context-app-ds ,rand ,env ,ctx)))
+
+(define context-app-rand-ds
+  (lambda (rator ctx)
+    `(context-app-rand-ds ,rator ,ctx)))
+
+;====================================================================================
+
+(define value-of-cps-ds
+  (lambda (expr env ctx)
+    (pmatch expr
+      [`,n (guard (or (number? n) (boolean? n))) 
+           (apply-context ctx n)]
+      [`(+ ,x1 ,x2)
+       (value-of-cps-ds x1 env
+                        (context-op-ds x2 env + ctx))]
+      [`(* ,x1 ,x2) 
+       (value-of-cps-ds x1 env (context-op-ds x2 env * ctx))]
+      [`(sub1 ,x) 
+       (value-of-cps-ds x env (context-tail-ds sub1 ctx))]
+      [`(zero? ,x) 
+       (value-of-cps-ds x env (context-tail-ds zero? ctx))]
+      [`(if ,test ,conseq ,alt) 
+       (value-of-cps-ds test env (context-if-ds conseq alt env ctx))]
+      [`(capture ,k-id ,body)
+       (value-of-cps-ds body (extend-env k-id ctx env) ctx)]
+      [`(return ,v-exp ,k-exp) 
+       (value-of-cps-ds k-exp env
+                        (context-return-ds v-exp env))] 
+      [`,x (guard (symbol? x))
+           (apply-context ctx (apply-env env x))]
+      [`(lambda (,id) ,body) 
+       (apply-context ctx (closure id body env))]
+#;    [`(lambda (,id1 ,id2) ,body) 
+         (apply-context ctx (closure id1 id2 body env))]
+      [`(,rator ,rand) 
+       (value-of-cps-ds rator env 
+                        (context-app-ds rand env ctx))])))
+#;#;#;#;
+(define fact-5
+  '((lambda (f)
+      ((f f) 5))
+    (lambda (f)
+      (lambda (n)
+        (if (zero? n)
+            1
+            (* n ((f f) (sub1 n))))))))
+(define capture-fun
+  '(* 3 (capture q (* 2 (return 4 q)))))
+(value-of-cps-ds fact-5 (empty-env) (empty-k-ds)) ; => 120
+(value-of-cps-ds capture-fun (empty-env) (empty-k-ds)) ; =>12
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Braindteaser ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; implement streams, a data-structure that enables us to process infinite lists of items.
 (define the-empty-stream '())
@@ -232,3 +401,24 @@
       [else (cons (car$ $) (take$ (sub1 n) (cdr$ $)))])))
 #;(foldl + 0 (take$ 200 natural-numbers))
 ; => 19900
+
+; implement the tribonacci stream which is a little like fibonacci, but
+; the current number is the sum of the previous three number in the sequence.
+(define zipWith$
+  (lambda (f $1 $2)
+    (cons$ (f (car$ $1)
+              (car$ $2))
+           (zipWith$ f
+                     (cdr$ $1)
+                     (cdr$ $2)))))
+(define trib$
+  (cons$ 0 
+         (cons$ 1 
+                (cons$ 1 
+                       (zipWith$ +
+                                 trib$
+                                 (zipWith$ + 
+                                           (cdr$ trib$)
+                                           (cdr$ (cdr$ trib$))))))))
+#;(take$ 10 trib$)
+; => (0 1 1 2 4 7 13 24 44 81)
