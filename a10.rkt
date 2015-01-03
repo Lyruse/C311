@@ -130,3 +130,14 @@
              (conso a d ls)
              (== out `(,a ,a . ,res))
              (stuttero d res))])))
+
+;;============================ Brainteaser ============================
+(define lengtho
+  (lambda (ls num)
+    (conde
+     [(nullo ls) (== num '())]
+     [(fresh (a d res)
+             (conso a d ls)
+             (lengtho d res)
+             (pluso '(1) res num)
+             )])))
