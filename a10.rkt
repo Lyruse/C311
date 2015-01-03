@@ -13,6 +13,8 @@
 (require C311/let-pair)
 (require C311/a10-student-tests)
 #;(test-file #:file-name "a10.rkt")
+; test result:
+; 35 success(es) 0 failure(s) 0 error(s) 35 test(s) run
 (provide (all-defined-out) (all-from-out C311/mk) (all-from-out C311/numbers))
 
 ;; Part I Write the answers to the following problems using your
@@ -93,8 +95,8 @@
                   (conde
                    [(== aa x)
                     (== out a)]
-                   [(=/= aa x)
-                    (assoco x d out)])))))
+                   [(=/= aa x)   ;; I like this =/=, for the latter answer would has 
+                    (assoco x d out)]))))) ; this constrain.
 
 (define reverse
   (lambda (ls)
