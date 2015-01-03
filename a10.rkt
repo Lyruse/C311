@@ -93,7 +93,8 @@
                   (conde
                    [(== aa x)
                     (== out a)]
-                   [(assoco x d out)])))))
+                   [(=/= aa x)
+                    (assoco x d out)])))))
 
 (define reverse
   (lambda (ls)
@@ -109,8 +110,9 @@
      [(nullo ls) (== out '())]
      [(fresh (a d out^)
              (conso a d ls)
-             (appendo out^ `(,a) out)
-             (reverseo d out^))])))
+             (reverseo d out^)
+             (appendo out^ `(,a) out)  ;; this is not small stuff.
+             )])))              ;; if put it before reverseo, it would never give answer.
 
 (define stutter
   (lambda (ls)
