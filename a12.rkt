@@ -9,8 +9,8 @@
 
 #lang racket
 (require C311/monads)
-#;(require C311/a10-student-tests)
-#;(test-file #:file-name "a10.rkt")
+#;(require C311/a12-student-tests)
+#;(test-file #:file-name "a12.rkt")
 #;#;#;
 (define return-maybe
   (lambda (a) `(Just ,a)))
@@ -209,3 +209,71 @@
                        (abc-game (cdr ls))))
        (abc-game (cdr ls))])))
 ;-------------------------------------------------------------------
+
+
+;----------------------     Mixed Monads Problems      ----------------------
+(define traverse
+  (lambda (return bind f)
+    (letrec
+        ((trav
+          (lambda (tree)
+            (cond
+              [(pair? tree)
+               (do bind
+                 (a <- (trav (car tree)))
+                 (d <- (trav (cdr tree)))
+                 (return (cons a d)))]
+              [else (f tree)]))))
+      trav)))
+
+;;;;;;;;;;;;;;;;;;;;;;  reciprocal  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; define reciprocal:
+;  takes a number n, return (/ 1 n). if it encounters 0, then return (Nothing).
+(define reciprocal
+  (lambda (n)
+    (cond
+      [(zero? n) (fail)]
+      [else (return-maybe (/ 1 n))])))
+(define traverse-reciprocal
+  (traverse return-maybe bind-maybe reciprocal))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;    Halve    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; define halve:
+;  takes a number, either will return in the monad half the number, or; 
+;  if the number is not divisible by two, will instead leave the original
+;  number in place and also log that number(using writer monad).
+; (halve 5) => (5 . (5))
+(define halve
+  (lambda (n)
+    (cond
+      [(even? n) (return-writer (/ n 2))]
+      [else (bind-writer (tell-writer n)
+                         (lambda (_)
+                           (return-writer n)))])))
+(define traverse-halve
+  (traverse return-writer bind-writer halve))
+;> (traverse-halve '((1 . 2) . (3 . (4 . 5))))
+;(((1 . 1) . (3 . (2 . 5))) . (1 3 5))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;  state/sum   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;define state/sum:
+;  takes a number, return the current state as the value,
+;  and add that number to the current state.
+#|
+> ((state/sum 2) 0)
+(0 . 2)
+ 
+> ((state/sum 2) 3)
+(3 . 5)
+|#
+
+(define state/sum
+  (lambda (n)
+    (lambda (s)
+      ((return-state s) (+ n s)))))
+(define traverse-state/sum
+  (traverse return-state bind-state state/sum))
+; ((traverse-state/sum '((1 . 2) . (3 . (4 . 5)))) 0)
+;=>(((0 . 1) 3 6 . 10) . 15)
+;----------------------------------------------------------------------------
